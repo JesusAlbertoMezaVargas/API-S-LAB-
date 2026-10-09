@@ -6,5 +6,6 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => res.json({ message: 'API funcionando' }));
+app.use('/api/institutos', require('./routes/instituto.routes'));
 
 module.exports = app;
