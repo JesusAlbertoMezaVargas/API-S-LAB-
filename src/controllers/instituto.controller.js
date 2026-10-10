@@ -1,4 +1,8 @@
-const service = require('../services/instituto.service');
+const mongoService = require('../services/instituto.mongo.service');
+const supabaseService = require('../services/instituto.supabase.service');
+
+// La BD viene en el token JWT (req.db) y se elige al iniciar sesión
+const getService = (req) => (req.db === 'supabase' ? supabaseService : mongoService);
 
 const ok = (res, data, message = 'OK', status = 200) =>
   res.status(status).json({ success: true, message, data });
@@ -9,7 +13,8 @@ const notFound = (res, que = 'Registro') =>
 const fail = (res, e) => {
   let status = 500;
   if (['CastError', 'ValidationError'].includes(e.name)) status = 400;
-  if (e.code === 11000) status = 409;
+  if (e.code === '22P02') status = 400;
+  if (e.code === 11000 || e.code === '23505') status = 409;
   res.status(status).json({ success: false, message: 'Error en la operación', error: e.message });
 };
 
@@ -18,84 +23,76 @@ const wrap = (fn) => async (req, res) => {
 };
 
 // ---------- INSTITUTOS ----------
-exports.getAll = wrap(async (req, res) => ok(res, await service.getAll()));
+exports.getAll = wrap(async (req, res) =>
+  ok(res, await getService(req).getAll()));
 
 exports.getById = wrap(async (req, res) => {
-  const data = await service.getById(req.params.id);
+  const data = await getService(req).getById(req.params.id);
   return data ? ok(res, data) : notFound(res, 'Instituto');
 });
 
 exports.create = wrap(async (req, res) =>
-  ok(res, await service.create(req.body), 'Instituto creado', 201));
+  ok(res, await getService(req).create(req.body), 'Instituto creado', 201));
 
 exports.createMany = wrap(async (req, res) => {
-  const registros = await service.createMany(req.body);
+  const registros = await getService(req).createMany(req.body);
   ok(res, { insertados: registros.length, registros }, 'Institutos creados', 201);
 });
 
 exports.update = wrap(async (req, res) => {
-  const data = await service.update(req.params.id, req.body);
+  const data = await getService(req).update(req.params.id, req.body);
   return data ? ok(res, data, 'Instituto actualizado') : notFound(res, 'Instituto');
 });
 
-exports.updateMany = wrap(async (req, res) => {
-  const r = await service.updateMany(req.body);
-  ok(res, { modificados: r.modifiedCount }, 'Institutos actualizados');
-});
+exports.updateMany = wrap(async (req, res) =>
+  ok(res, await getService(req).updateMany(req.body), 'Institutos actualizados'));
 
 exports.remove = wrap(async (req, res) => {
-  const data = await service.remove(req.params.id);
-  return data ? ok(res, { eliminado: true, id: req.params.id }, 'Instituto eliminado')
+  const done = await getService(req).remove(req.params.id);
+  return done ? ok(res, { eliminado: true, id: req.params.id }, 'Instituto eliminado')
               : notFound(res, 'Instituto');
 });
 
-exports.removeMany = wrap(async (req, res) => {
-  const r = await service.removeMany(req.body.ids);
-  ok(res, { eliminados: r.deletedCount }, 'Institutos eliminados');
-});
+exports.removeMany = wrap(async (req, res) =>
+  ok(res, await getService(req).removeMany(req.body.ids), 'Institutos eliminados'));
 
 // ---------- CARRERAS ----------
 exports.getCarreras = wrap(async (req, res) => {
-  const data = await service.getCarreras(req.params.id);
+  const data = await getService(req).getCarreras(req.params.id);
   return data ? ok(res, data) : notFound(res, 'Instituto');
 });
 
 exports.getCarrera = wrap(async (req, res) => {
-  const data = await service.getCarrera(req.params.id, req.params.subId);
+  const data = await getService(req).getCarrera(req.params.id, req.params.subId);
   return data ? ok(res, data) : notFound(res, 'Carrera');
 });
 
 exports.addCarrera = wrap(async (req, res) => {
-  const inst = await service.addCarrera(req.params.id, req.body);
-  if (!inst) return notFound(res, 'Instituto');
-  ok(res, inst.carreras[inst.carreras.length - 1], 'Carrera agregada', 201);
+  const carrera = await getService(req).addCarrera(req.params.id, req.body);
+  return carrera ? ok(res, carrera, 'Carrera agregada', 201) : notFound(res, 'Instituto');
 });
 
 exports.addCarreras = wrap(async (req, res) => {
-  const inst = await service.addCarreras(req.params.id, req.body);
-  if (!inst) return notFound(res, 'Instituto');
-  ok(res, { insertados: req.body.length, carreras: inst.carreras }, 'Carreras agregadas', 201);
+  const carreras = await getService(req).addCarreras(req.params.id, req.body);
+  return carreras ? ok(res, { insertados: carreras.length, carreras }, 'Carreras agregadas', 201)
+                  : notFound(res, 'Instituto');
 });
 
 exports.updateCarrera = wrap(async (req, res) => {
-  const inst = await service.updateCarrera(req.params.id, req.params.subId, req.body);
-  return inst ? ok(res, inst.carreras.id(req.params.subId), 'Carrera actualizada')
+  const carrera = await getService(req).updateCarrera(req.params.id, req.params.subId, req.body);
+  return carrera ? ok(res, carrera, 'Carrera actualizada') : notFound(res, 'Carrera');
+});
+
+exports.updateCarreras = wrap(async (req, res) =>
+  ok(res, await getService(req).updateCarreras(req.params.id, req.body), 'Carreras actualizadas'));
+
+exports.removeCarrera = wrap(async (req, res) => {
+  const done = await getService(req).removeCarrera(req.params.id, req.params.subId);
+  return done ? ok(res, { eliminado: true, id: req.params.subId }, 'Carrera eliminada')
               : notFound(res, 'Carrera');
 });
 
-exports.updateCarreras = wrap(async (req, res) => {
-  const r = await service.updateCarreras(req.params.id, req.body);
-  ok(res, { modificados: r.modifiedCount }, 'Carreras actualizadas');
-});
-
-exports.removeCarrera = wrap(async (req, res) => {
-  const inst = await service.removeCarrera(req.params.id, req.params.subId);
-  return inst ? ok(res, { eliminado: true, id: req.params.subId }, 'Carrera eliminada')
-              : notFound(res, 'Instituto');
-});
-
 exports.removeCarreras = wrap(async (req, res) => {
-  const inst = await service.removeCarreras(req.params.id, req.body.ids);
-  return inst ? ok(res, { eliminados: req.body.ids.length }, 'Carreras eliminadas')
-              : notFound(res, 'Instituto');
+  const r = await getService(req).removeCarreras(req.params.id, req.body.ids);
+  return r ? ok(res, r, 'Carreras eliminadas') : notFound(res, 'Instituto');
 });

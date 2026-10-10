@@ -4,8 +4,8 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-     "start": "node src/index.js",
-     "dev": "nodemon src/index.js"
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +21,7 @@
   "homepage": "https://github.com/JesusAlbertoMezaVargas/API-S-LAB-#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
